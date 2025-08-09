@@ -1,7 +1,9 @@
 import { Transaction, Budget } from '../types';
 
-const TRANSACTIONS_KEY = 'expense_tracker_transactions';
-const BUDGETS_KEY = 'expense_tracker_budgets';
+
+const TRANSACTIONS_KEY = 'spendly_transactions';
+const BUDGETS_KEY = 'spendly_budgets';
+
 
 export const saveTransactions = (transactions: Transaction[]): void => {
   localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));

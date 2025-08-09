@@ -578,7 +578,15 @@ const SavingsDashboard: React.FC<SavingsDashboardProps> = ({ transactions }) => 
                       max: Math.max(20, Math.max(...monthlySavingsData.map(d => d.savingsRate)) + 2),
                       ticks: {
                         callback: function(value) {
-                          return value + '%';
+                          return Math.round(value as number) + '%';
+                        },
+                        stepSize: 1
+                      }
+                    },
+                    x: {
+                      ticks: {
+                        callback: function(value, index) {
+                          return monthlySavingsData[index]?.shortMonth || '';
                         }
                       }
                     }

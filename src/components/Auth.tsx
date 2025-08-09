@@ -59,7 +59,9 @@ const Auth: React.FC = () => {
             {isSignUp ? 'Create your account' : 'Sign in to your account'}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            {isSignUp ? 'Start tracking your expenses today' : 'Welcome back to Expense Tracker'}
+
+            {isSignUp ? 'Start tracking your expenses today' : 'Welcome back to Spendly'}
+
           </p>
         </div>
         

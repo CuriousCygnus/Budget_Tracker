@@ -42,8 +42,17 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'monthly' | 'cumulative'>('cumulative');
+  // Set default to most recent month with data, or current month if no data
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    if (transactions.length === 0) return new Date();
+    
+    const monthsWithData = Array.from(new Set(
+      transactions.map(t => format(t.date, 'yyyy-MM'))
+    )).sort().reverse();
+    
+    return monthsWithData.length > 0 ? new Date(monthsWithData[0] + '-01') : new Date();
+  });
+  const [viewMode, setViewMode] = useState<'monthly' | 'cumulative'>('monthly');
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [insights, setInsights] = useState<string[]>([]);
   

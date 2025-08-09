@@ -33,7 +33,9 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange, user 
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2">
             <PiggyBank className="h-8 w-8 text-green-600" />
-            <h1 className="text-xl font-bold text-gray-800">Expense Tracker</h1>
+
+            <h1 className="text-xl font-bold text-gray-800">Spendly</h1>
+
           </div>
           
           <div className="flex items-center space-x-4">

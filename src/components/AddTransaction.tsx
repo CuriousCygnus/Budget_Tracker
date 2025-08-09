@@ -275,7 +275,9 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `expense-tracker-${new Date().toISOString().split('T')[0]}.csv`;
+
+    a.download = `spendly-export-${new Date().toISOString().split('T')[0]}.csv`;
+
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -308,14 +310,6 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
               className="hidden"
             />
           </label>
-          
-          <button
-            onClick={handleCsvExport}
-            className="flex items-center space-x-2 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-lg transition-colors"
-          >
-            <Download className="h-5 w-5 text-green-600" />
-            <span className="text-green-600 font-medium">Download Expense Template</span>
-          </button>
         </div>
         
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
