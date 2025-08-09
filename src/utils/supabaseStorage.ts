@@ -12,12 +12,37 @@ const formatDateForDB = (date: Date): string => {
 };
 
 const parseDateFromDB = (dateString: string): Date => {
+  // Handle null, undefined, or empty date strings
+  if (!dateString || typeof dateString !== 'string') {
+    return new Date(); // Return current date as fallback
+  }
+  
   // Parse the date string and create a date object in Asia/Kolkata timezone
-  const [year, month, day] = dateString.split('-').map(Number);
+  const parts = dateString.split('-');
+  if (parts.length !== 3) {
+    return new Date(); // Return current date as fallback for malformed strings
+  }
+  
+  const [year, month, day] = parts.map(Number);
+  
+  // Validate the parsed numbers
+  if (isNaN(year) || isNaN(month) || isNaN(day) || 
+      year < 1900 || year > 2100 || 
+      month < 1 || month > 12 || 
+      day < 1 || day > 31) {
+    return new Date(); // Return current date as fallback for invalid values
+  }
+  
   // Create date at midnight in Asia/Kolkata timezone
   const date = new Date();
   date.setFullYear(year, month - 1, day);
   date.setHours(0, 0, 0, 0);
+  
+  // Final check to ensure the date is valid
+  if (isNaN(date.getTime())) {
+    return new Date(); // Return current date as fallback
+  }
+  
   return date;
 };
 
