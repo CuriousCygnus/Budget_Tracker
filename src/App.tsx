@@ -212,7 +212,7 @@ function App() {
     switch (activeView) {
       case 'dashboard':
         return <Dashboard transactions={transactions} budgets={budgets} />;
-      case 'ai-insights':
+      case 'ai-insights': // Keep the same ID for routing
         return <AIInsights transactions={transactions} />;
       case 'savings':
         return <SavingsDashboard transactions={transactions} />;
@@ -232,6 +232,7 @@ function App() {
             transactions={transactions}
             onDeleteTransaction={handleDeleteTransaction}
             onEditTransaction={handleEditTransaction}
+            onBulkDelete={loadData}
           />
         );
       case 'budget-settings':

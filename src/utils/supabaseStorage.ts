@@ -1,6 +1,31 @@
 import { supabase } from '../lib/supabase';
 import { Transaction, Budget } from '../types';
 
+// Utility functions for date handling in Asia/Kolkata timezone
+const formatDateForDB = (date: Date): string => {
+  // Create a new date in Asia/Kolkata timezone
+  const istDate = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+  const year = istDate.getFullYear();
+  const month = String(istDate.getMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateFromDB = (dateString: string): Date => {
+  // Parse the date string and create a date object in Asia/Kolkata timezone
+  const [year, month, day] = dateString.split('-').map(Number);
+  // Create date at midnight in Asia/Kolkata timezone
+  const date = new Date();
+  date.setFullYear(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const getCurrentDateIST = (): string => {
+  const now = new Date();
+  return formatDateForDB(now);
+};
+
 // Transaction operations
 export const saveTransaction = async (transaction: Transaction): Promise<{ data: any; error: any }> => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -13,7 +38,7 @@ export const saveTransaction = async (transaction: Transaction): Promise<{ data:
     .from('transactions')
     .insert({
       user_id: user.id,
-      date: transaction.date.toISOString().split('T')[0],
+      date: formatDateForDB(transaction.date),
       category: transaction.category,
       subcategory: transaction.subcategory,
       amount: transaction.amount,
@@ -46,7 +71,7 @@ export const loadTransactions = async (): Promise<Transaction[]> => {
 
   return data.map(t => ({
     id: t.id,
-    date: new Date(t.date),
+    date: parseDateFromDB(t.date),
     category: t.category,
     subcategory: t.subcategory,
     amount: t.amount,
@@ -65,7 +90,7 @@ export const updateTransaction = async (transaction: Transaction): Promise<{ dat
   const { data, error } = await supabase
     .from('transactions')
     .update({
-      date: transaction.date.toISOString().split('T')[0],
+      date: formatDateForDB(transaction.date),
       category: transaction.category,
       subcategory: transaction.subcategory,
       amount: transaction.amount,
@@ -105,7 +130,7 @@ export const bulkInsertTransactions = async (transactions: Transaction[]): Promi
 
   const transactionsToInsert = transactions.map(t => ({
     user_id: user.id,
-    date: t.date.toISOString().split('T')[0],
+    date: formatDateForDB(t.date),
     category: t.category,
     subcategory: t.subcategory,
     amount: t.amount,
@@ -119,6 +144,42 @@ export const bulkInsertTransactions = async (transactions: Transaction[]): Promi
     .select();
 
   return { data, error };
+};
+
+export const deleteTransactionsByMonth = async (month: string): Promise<{ error: any }> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return { error: { message: 'User not authenticated' } };
+  }
+
+  // Delete transactions for the specific month (YYYY-MM format)
+  const startDate = `${month}-01`;
+  const endDate = `${month}-31`; // This will work for all months
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('user_id', user.id)
+    .gte('date', startDate)
+    .lte('date', endDate);
+
+  return { error };
+};
+
+export const deleteAllTransactions = async (): Promise<{ error: any }> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return { error: { message: 'User not authenticated' } };
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('user_id', user.id);
+
+  return { error };
 };
 
 // Budget operations

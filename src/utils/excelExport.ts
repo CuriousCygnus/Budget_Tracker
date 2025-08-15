@@ -242,6 +242,6 @@ export const exportMonthlyReportToExcel = (
   XLSX.utils.book_append_sheet(workbook, budgetSheet, 'Budget Analysis');
 
   // Generate filename and download
-  const filename = `Monthly_Report_${format(selectedMonth, 'yyyy_MM')}.xlsx`;
+  const filename = `Spendly_Report_${format(selectedMonth, 'yyyy_MM')}.xlsx`;
   XLSX.writeFile(workbook, filename);
 };

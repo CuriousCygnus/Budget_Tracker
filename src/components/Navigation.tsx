@@ -14,9 +14,9 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange, user 
   
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-    { id: 'ai-insights', label: 'AI Insights', icon: Brain },
-    { id: 'budget-settings', label: 'Goals', icon: Target },
     { id: 'savings', label: 'Savings', icon: PiggyBank },
+    { id: 'ai-insights', label: 'Expense', icon: Brain },
+    { id: 'budget-settings', label: 'Recommended Credit Cards', icon: Target },
     { id: 'add-transaction', label: 'Add Transaction', icon: Plus },
     { id: 'history', label: 'History', icon: History },
   ];
@@ -33,7 +33,9 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange, user 
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2">
             <PiggyBank className="h-8 w-8 text-green-600" />
-            <h1 className="text-xl font-bold text-gray-800">Budget Tracker</h1>
+
+            <h1 className="text-xl font-bold text-gray-800">Spendly</h1>
+
           </div>
           
           <div className="flex items-center space-x-4">

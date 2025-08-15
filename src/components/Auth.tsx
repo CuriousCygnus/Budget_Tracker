@@ -8,7 +8,14 @@ const Auth: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, error: authError } = useAuth();
+
+  // Show auth service error if present
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,12 +28,17 @@ const Auth: React.FC = () => {
         : await signIn(email, password);
 
       if (error) {
-        setError(error.message);
+        if (error.message.includes('Network error') || error.message.includes('fetch')) {
+          setError('Connection failed. Please check your internet connection and verify that your Supabase project is properly configured.');
+        } else {
+          setError(error.message);
+        }
       } else if (isSignUp) {
-        setError('Check your email for the confirmation link!');
+        setError('Account created successfully! You can now sign in.');
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('Auth error:', err);
+      setError('Connection failed. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -47,7 +59,9 @@ const Auth: React.FC = () => {
             {isSignUp ? 'Create your account' : 'Sign in to your account'}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            {isSignUp ? 'Start tracking your budget today' : 'Welcome back to Budget Tracker'}
+
+            {isSignUp ? 'Start tracking your expenses today' : 'Welcome back to Spendly'}
+
           </p>
         </div>
         

@@ -4,75 +4,83 @@ import { generateId } from './calculations';
 
 // Sample descriptions for different expense categories
 const SAMPLE_DESCRIPTIONS = {
-  'Leisure': {
-    'Clothes': ['New shirt from H&M', 'Winter jacket', 'Running shoes', 'Jeans', 'Dress for party'],
-    'Entertainment': ['Movie tickets', 'Concert tickets', 'Netflix subscription', 'Video game', 'Book purchase'],
-    'Vacation': ['Flight to Paris', 'Hotel booking', 'Car rental', 'Travel insurance', 'Souvenirs'],
-    'Gifts': ['Birthday gift for mom', 'Wedding present', 'Christmas gifts', 'Anniversary gift', 'Baby shower gift'],
-    'Cigarette': ['Pack of cigarettes', 'Cigarettes from gas station', 'Weekly cigarette supply'],
-    'Casino': ['Poker night', 'Slot machines', 'Blackjack game', 'Lottery tickets', 'Sports betting'],
-    'Party': ['Birthday party supplies', 'New Year celebration', 'House party drinks', 'Party decorations'],
-    'Maintenance': ['Car oil change', 'Home repairs', 'Bike maintenance', 'Phone screen repair'],
-    'Netflix': ['Netflix monthly subscription'],
-    'Disney Plus': ['Disney Plus monthly subscription'],
-    'HBO': ['HBO Max subscription'],
-    'Spotify': ['Spotify Premium subscription'],
-    'AI subscriptions': ['ChatGPT Plus', 'Midjourney subscription', 'Claude Pro']
+  'Living Expenses': {
+    'Grocery': ['Weekly groceries', 'Supermarket shopping', 'Fresh produce', 'Organic food shopping'],
+    'Maids': ['House cleaning service', 'Maid salary', 'Domestic help payment'],
+    'Fruits & Vegetables': ['Fresh fruits', 'Vegetable market', 'Organic vegetables', 'Fruit vendor'],
+    'Utilities': ['Electricity bill', 'Water bill', 'Gas bill', 'Internet bill'],
+    'Personal Care': ['Shampoo and soap', 'Toothpaste', 'Skincare products', 'Haircut']
   },
-  'Dining Out': {
-    'Restaurant': ['Dinner at Italian place', 'Lunch with colleagues', 'Date night dinner', 'Family brunch', 'Thai takeout'],
-    'Coffee': ['Morning coffee', 'Starbucks latte', 'Coffee with friends', 'Afternoon espresso'],
-    'Sandwich': ['Subway lunch', 'Deli sandwich', 'Quick lunch break', 'Airport sandwich']
+  'Rental': {
+    'House Rent': ['Monthly house rent', 'Apartment rent', 'Home rental payment'],
+    'Office Rent': ['Office space rent', 'Co-working space', 'Business premises rent']
   },
-  'Medical': {
-    'Scans': ['MRI scan', 'X-ray examination', 'Ultrasound', 'CT scan'],
-    'Medical Insurance': ['Monthly health insurance', 'Dental insurance premium'],
-    'Physiotherapy': ['Physical therapy session', 'Sports injury treatment'],
-    'Dental': ['Dental cleaning', 'Tooth filling', 'Dental checkup'],
-    'Prescriptions': ['Antibiotics', 'Vitamins', 'Pain medication', 'Allergy medicine'],
-    'GP': ['General practitioner visit', 'Annual checkup', 'Flu consultation'],
-    'Blood test': ['Annual blood work', 'Cholesterol test', 'Diabetes screening'],
-    'Hospital': ['Emergency room visit', 'Surgery', 'Hospital stay']
+  'Debt': {
+    'Car Loan': ['Car loan EMI', 'Vehicle financing payment'],
+    'Home Loan': ['Home loan EMI', 'Mortgage payment', 'Housing loan installment'],
+    'Personal Loan': ['Personal loan EMI', 'Credit card payment']
   },
-  'Personal Development': {
-    'Courses': ['Online programming course', 'Language learning app', 'Professional certification'],
-    'Gym': ['Monthly gym membership', 'Personal trainer session', 'Yoga class']
+  'Education': {
+    'School Fees': ['School tuition fees', 'Admission fees', 'School supplies'],
+    'Tuition': ['Private tuition', 'Coaching classes', 'Online courses'],
+    'Books': ['Educational books', 'Study materials', 'Reference books']
   },
-  'Transport': {
+  'Healthcare': {
+    'Medical Bills': ['Doctor consultation', 'Hospital bills', 'Medical tests'],
+    'Medicine': ['Prescription medicines', 'Health supplements', 'First aid supplies']
+  },
+  'Transportation': {
+    'Fuel': ['Petrol', 'Diesel', 'Gas station'],
     'Taxi': ['Uber to airport', 'Late night taxi', 'Taxi to meeting', 'Weekend taxi ride'],
-    'Bus': ['Monthly bus pass', 'City bus ticket', 'Long distance bus']
+    'Public Transport': ['Bus ticket', 'Metro card', 'Train ticket']
+  },
+  'Entertainment': {
+    'Movies': ['Movie tickets', 'Cinema hall', 'Netflix subscription'],
+    'Dining Out': ['Restaurant dinner', 'Lunch with friends', 'Coffee shop'],
+    'Vacation': ['Holiday trip', 'Weekend getaway', 'Travel expenses']
+  },
+  'Shopping': {
+    'Clothes': ['New shirt', 'Winter jacket', 'Running shoes', 'Jeans'],
+    'Electronics': ['Mobile phone', 'Laptop', 'Headphones', 'Charger']
   },
   'Charity': {
-    'Donation': ['Red Cross donation', 'Local food bank', 'Animal shelter donation', 'Disaster relief fund']
-  },
-  'Bills': {
-    'Electricity': ['Monthly electricity bill'],
-    'Gas': ['Monthly gas bill'],
-    'Water': ['Quarterly water bill'],
-    'Broadband': ['Internet service provider'],
-    'Bins': ['Waste management fee']
+    'Donations': ['Charity donation', 'Religious contribution', 'NGO support']
   },
   'Savings': {
-    'Long term saving': ['Retirement fund contribution', '401k contribution'],
-    'Short term saving': ['Holiday fund deposit', 'Emergency fund'],
-    'Investments': ['Stock purchase', 'Crypto investment', 'Mutual fund']
+    'SIPs': ['Mutual fund SIP', 'Systematic investment plan', 'Monthly SIP'],
+    'Fixed Deposits': ['Bank FD', 'Term deposit', 'Savings deposit']
   },
-  'Living Expenses': {
-    'Grocery': ['Weekly groceries', 'Costco shopping', 'Fresh produce', 'Organic food shopping'],
-    'Laundry': ['Laundromat', 'Dry cleaning', 'Detergent purchase'],
-    'Inessentials': ['Snacks', 'Impulse purchase', 'Random shopping'],
-    'Toiletries': ['Shampoo and soap', 'Toothpaste', 'Skincare products'],
-    'Kitchen supplies': ['Cooking utensils', 'Food containers', 'Kitchen appliances']
+  'Insurance': {
+    'Life Insurance': ['Life insurance premium', 'Term insurance'],
+    'Health Insurance': ['Medical insurance premium', 'Family health cover']
+  },
+  'Taxes': {
+    'Income Tax': ['Annual income tax', 'Tax payment', 'TDS'],
+    'Property Tax': ['House tax', 'Municipal tax']
+  },
+  'Other': {
+    'Miscellaneous': ['Bank charges', 'ATM fees', 'Service charges'],
+    'Professional Services': ['Legal fees', 'Consultant fees', 'Professional advice']
   }
 };
 
 const INCOME_DESCRIPTIONS = {
-  'Fixed Income': {
+  'Employment Income': {
     'Salary': ['Monthly salary', 'Bi-weekly paycheck', 'Bonus payment', 'Overtime pay']
   },
-  'Variable Income': {
-    'Dividends': ['Stock dividends', 'Mutual fund dividends', 'REIT dividends'],
-    'Casino profit': ['Poker winnings', 'Lottery prize', 'Sports betting win', 'Casino jackpot']
+  'Investment Income': {
+    'Dividends': ['Stock dividends', 'Mutual fund dividends', 'Investment returns'],
+    'Interest': ['Bank interest', 'FD interest', 'Savings interest']
+  },
+  'Rental Income': {
+    'Property Rent': ['House rent received', 'Commercial rent', 'Property rental income']
+  },
+  'Business Income': {
+    'Business Profits': ['Business income', 'Freelance payment', 'Consulting income']
+  },
+  'Other Income': {
+    'Gifts': ['Birthday gift', 'Festival gift', 'Wedding gift received'],
+    'Refunds': ['Tax refund', 'Purchase refund', 'Insurance claim']
   }
 };
 
@@ -110,14 +118,17 @@ const getRandomDateInMonth = (monthOffset: number): Date => {
 const getWeightedRandomCategory = (categories: string[]): string => {
   const weights: { [key: string]: number } = {
     'Living Expenses': 3, // Most frequent
-    'Dining Out': 2.5,
-    'Leisure': 2,
-    'Transport': 2,
-    'Bills': 1.5,
-    'Medical': 1,
-    'Personal Development': 0.8,
+    'Rental': 2.5,
+    'Transportation': 2,
+    'Entertainment': 2,
+    'Healthcare': 1.5,
+    'Education': 1,
+    'Debt': 1.2,
     'Charity': 0.5,
-    'Savings': 1.2
+    'Savings': 1.5,
+    'Shopping': 1.8,
+    'Insurance': 0.8,
+    'Taxes': 0.6
   };
   
   const weightedCategories: string[] = [];
@@ -156,57 +167,110 @@ const generateExpenseTransactions = (count: number, distributeAcrossMonths: bool
       const monthlyVariation = 0.8 + (Math.random() * 0.4); // 80% to 120% variation
       
       switch (category) {
-        case 'Leisure':
+        case 'Living Expenses':
+          if (subcategory === 'Grocery') {
+            minAmount = 50;
+            maxAmount = 200;
+          } else if (subcategory === 'Maids') {
+            minAmount = 100;
+            maxAmount = 300;
+          } else {
+            minAmount = 20;
+            maxAmount = 100;
+          }
+          break;
+        case 'Rental':
+          minAmount = 5000;
+          maxAmount = 25000;
+          break;
+        case 'Debt':
+          if (subcategory === 'Home Loan') {
+            minAmount = 15000;
+            maxAmount = 50000;
+          } else if (subcategory === 'Car Loan') {
+            minAmount = 8000;
+            maxAmount = 25000;
+          } else {
+            minAmount = 2000;
+            maxAmount = 10000;
+          }
+          break;
+        case 'Education':
+          if (subcategory === 'School Fees') {
+            minAmount = 2000;
+            maxAmount = 15000;
+          } else {
+            minAmount = 500;
+            maxAmount = 5000;
+          }
+          break;
+        case 'Entertainment':
           if (subcategory === 'Vacation') {
             minAmount = 200;
             maxAmount = 2000;
-          } else if (subcategory === 'Clothes') {
-            minAmount = 25;
-            maxAmount = 300;
-          } else if (subcategory === 'Netflix' || subcategory === 'Disney Plus' || subcategory === 'HBO' || subcategory === 'Spotify') {
-            minAmount = 8;
-            maxAmount = 25; // Subscription services
           } else {
             minAmount = 10;
             maxAmount = 150;
           }
           break;
-        case 'Dining Out':
-          minAmount = 8;
-          maxAmount = 80;
-          break;
-        case 'Medical':
-          if (subcategory === 'Medical Insurance') {
+        case 'Healthcare':
+          if (subcategory === 'Medical Bills') {
             minAmount = 200;
             maxAmount = 500;
-          } else if (subcategory === 'Hospital') {
-            minAmount = 500;
-            maxAmount = 5000;
           } else {
             minAmount = 30;
             maxAmount = 300;
           }
           break;
-        case 'Bills':
-          minAmount = 50;
-          maxAmount = 300;
-          break;
-        case 'Savings':
-          minAmount = 100;
-          maxAmount = 2000;
-          break;
-        case 'Living Expenses':
-          if (subcategory === 'Grocery') {
-            minAmount = 50;
-            maxAmount = 200;
+        case 'Transportation':
+          if (subcategory === 'Fuel') {
+            minAmount = 100;
+            maxAmount = 500;
           } else {
-            minAmount = 15;
-            maxAmount = 100;
+            minAmount = 20;
+            maxAmount = 200;
           }
           break;
-        case 'Transport':
-          minAmount = 5;
-          maxAmount = 50;
+        case 'Savings':
+          if (subcategory === 'SIPs') {
+            minAmount = 1000;
+            maxAmount = 10000;
+          } else if (subcategory === 'Mutual Fund') {
+            minAmount = 5000;
+            maxAmount = 50000;
+          } else if (subcategory === 'Stocks') {
+            minAmount = 2000;
+            maxAmount = 25000;
+          } else if (subcategory === 'FD') {
+            minAmount = 10000;
+            maxAmount = 100000;
+          } else if (subcategory === 'RD') {
+            minAmount = 1000;
+            maxAmount = 5000;
+          } else if (subcategory === 'AIF') {
+            minAmount = 25000;
+            maxAmount = 200000;
+          } else {
+            minAmount = 500;
+            maxAmount = 5000;
+          }
+          break;
+        case 'Shopping':
+          if (subcategory === 'Electronics') {
+            minAmount = 500;
+            maxAmount = 5000;
+          } else {
+            minAmount = 200;
+            maxAmount = 2000;
+          }
+          break;
+        case 'Insurance':
+          minAmount = 500;
+          maxAmount = 3000;
+          break;
+        case 'Taxes':
+          minAmount = 1000;
+          maxAmount = 20000;
           break;
         default:
           minAmount = 20;
@@ -262,9 +326,13 @@ const generateIncomeTransactions = (count: number, distributeAcrossMonths: boole
           minAmount = 50;
           maxAmount = 500;
           break;
-        case 'Casino profit':
-          minAmount = 20;
-          maxAmount = 1000;
+        case 'Property Rent':
+          minAmount = 2000;
+          maxAmount = 8000;
+          break;
+        case 'Business Profits':
+          minAmount = 1000;
+          maxAmount = 5000;
           break;
         default:
           minAmount = 100;
@@ -315,21 +383,25 @@ export const generateSampleBudgets = () => {
     
     // Income budgets
     budgets.push(
-      { category: 'Fixed Income', amount: Math.round(5000 * budgetVariation), month: monthStr },
-      { category: 'Variable Income', amount: Math.round(300 * budgetVariation), month: monthStr }
+      { category: 'Salary', amount: Math.round(50000 * budgetVariation), month: monthStr },
+      { category: 'Dividend', amount: Math.round(3000 * budgetVariation), month: monthStr },
+      { category: 'Rental Income', amount: Math.round(8000 * budgetVariation), month: monthStr }
     );
     
     // Expense budgets
     budgets.push(
-      { category: 'Leisure', amount: Math.round(500 * budgetVariation), month: monthStr },
-      { category: 'Dining Out', amount: Math.round(300 * budgetVariation), month: monthStr },
-      { category: 'Medical', amount: Math.round(200 * budgetVariation), month: monthStr },
-      { category: 'Personal Development', amount: Math.round(150 * budgetVariation), month: monthStr },
-      { category: 'Transport', amount: Math.round(100 * budgetVariation), month: monthStr },
+      { category: 'Living Expenses', amount: Math.round(8000 * budgetVariation), month: monthStr },
+      { category: 'Rental', amount: Math.round(15000 * budgetVariation), month: monthStr },
+      { category: 'Debt', amount: Math.round(12000 * budgetVariation), month: monthStr },
+      { category: 'Education', amount: Math.round(5000 * budgetVariation), month: monthStr },
+      { category: 'Healthcare', amount: Math.round(2000 * budgetVariation), month: monthStr },
+      { category: 'Transportation', amount: Math.round(3000 * budgetVariation), month: monthStr },
+      { category: 'Entertainment', amount: Math.round(2000 * budgetVariation), month: monthStr },
+      { category: 'Shopping', amount: Math.round(3000 * budgetVariation), month: monthStr },
+      { category: 'Insurance', amount: Math.round(2000 * budgetVariation), month: monthStr },
+      { category: 'Taxes', amount: Math.round(5000 * budgetVariation), month: monthStr },
       { category: 'Charity', amount: Math.round(100 * budgetVariation), month: monthStr },
-      { category: 'Bills', amount: Math.round(800 * budgetVariation), month: monthStr },
-      { category: 'Savings', amount: Math.round(1500 * budgetVariation), month: monthStr },
-      { category: 'Living Expenses', amount: Math.round(600 * budgetVariation), month: monthStr }
+      { category: 'Savings', amount: Math.round(8000 * budgetVariation), month: monthStr }
     );
   }
   

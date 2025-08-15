@@ -99,192 +99,170 @@ const BudgetSettings: React.FC<BudgetSettingsProps> = ({ budgets, onUpdateBudget
       <div className="bg-white p-6 rounded-xl shadow-lg">
         <div className="flex items-center space-x-2 mb-4">
           <Settings className="h-6 w-6 text-green-600" />
-          <h2 className="text-2xl font-semibold text-gray-800">Budget Settings</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">Recommended Credit Cards</h2>
         </div>
         
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div className="mb-4 sm:mb-0">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Month
-            </label>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
-          
-          <div className="text-right">
-            <div className="text-sm text-gray-600">Total Budget</div>
-            <div className="text-2xl font-bold text-gray-800">
-              {formatCurrency(totalBudget)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Budget Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500">
-          <h3 className="text-lg font-medium text-gray-800">Income Budget</h3>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(incomeBudget)}</p>
-        </div>
-        
-        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
-          <h3 className="text-lg font-medium text-gray-800">Expense Budget</h3>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(expenseBudget)}</p>
-        </div>
-        
-        <div className={`bg-white p-6 rounded-xl shadow-lg border-l-4 ${
-          incomeBudget - expenseBudget >= 0 ? 'border-green-500' : 'border-red-500'
-        }`}>
-          <h3 className="text-lg font-medium text-gray-800">Projected Surplus</h3>
-          <p className={`text-2xl font-bold ${
-            incomeBudget - expenseBudget >= 0 ? 'text-green-600' : 'text-red-600'
-          }`}>
-            {formatCurrency(incomeBudget - expenseBudget)}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <p className="text-sm text-blue-800">
+            Based on your spending patterns, here are personalized credit card recommendations to maximize your rewards and benefits.
           </p>
         </div>
       </div>
 
-      {/* Budget Categories */}
-      <div className="bg-white p-6 rounded-xl shadow-lg">
-        <h3 className="text-lg font-semibold text-gray-800 mb-6">Category Budgets</h3>
-        
-        {/* Income Categories */}
-        <div className="mb-8">
-          <h4 className="font-medium text-green-700 mb-4">Income Categories</h4>
-          <div className="space-y-3">
-            {Object.entries(monthlyBudgets)
-              .filter(([category]) => Object.keys(INCOME_CATEGORIES).includes(category))
-              .map(([category, amount]) => (
-                <div key={category} className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {category}
-                    </label>
-                    <div className="text-xs text-gray-500">
-                      {INCOME_CATEGORIES[category]?.join(', ')}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={amount || ''}
-                      onChange={(e) => handleBudgetChange(category, e.target.value)}
-                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="0.00"
-                    />
-                    <button
-                      onClick={() => handleRemoveCategory(category)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* Expense Categories */}
-        <div className="mb-8">
-          <h4 className="font-medium text-red-700 mb-4">Expense Categories</h4>
-          <div className="space-y-3">
-            {Object.entries(monthlyBudgets)
-              .filter(([category]) => Object.keys(EXPENSE_CATEGORIES).includes(category))
-              .map(([category, amount]) => (
-                <div key={category} className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {category}
-                    </label>
-                    <div className="text-xs text-gray-500">
-                      {EXPENSE_CATEGORIES[category]?.join(', ')}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={amount || ''}
-                      onChange={(e) => handleBudgetChange(category, e.target.value)}
-                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="0.00"
-                    />
-                    <button
-                      onClick={() => handleRemoveCategory(category)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* Add New Category */}
-        {availableCategories.length > 0 && (
-          <div className="border-t pt-6">
-            <h4 className="font-medium text-gray-700 mb-4">Add Category</h4>
-            <div className="flex items-end space-x-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category
-                </label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Select category...</option>
-                  {availableCategories.map(category => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Budget Amount
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
-              <button
-                onClick={handleAddCategory}
-                disabled={!newCategory || !newAmount}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add</span>
-              </button>
+      {/* Top Credit Card Categories */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+          <h3 className="text-lg font-medium text-gray-800 mb-3">Living Expenses & Grocery</h3>
+          <p className="text-sm text-gray-600 mb-4">Best for high grocery/daily expenses</p>
+          <div className="space-y-2">
+            <div className="bg-blue-50 p-3 rounded">
+              <h4 className="font-medium text-blue-800">HDFC Millennia</h4>
+              <p className="text-xs text-blue-600">2.5% cashback on groceries, 1% on all purchases</p>
+            </div>
+            <div className="bg-blue-50 p-3 rounded">
+              <h4 className="font-medium text-blue-800">ICICI Amazon Pay</h4>
+              <p className="text-xs text-blue-600">2% on Amazon, 1% on others, no annual fee</p>
+            </div>
+            <div className="bg-blue-50 p-3 rounded">
+              <h4 className="font-medium text-blue-800">SBI Simply Save</h4>
+              <p className="text-xs text-blue-600">5% on groceries up to ₹2000/month</p>
             </div>
           </div>
-        )}
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500">
+          <h3 className="text-lg font-medium text-gray-800 mb-3">Transportation & Fuel</h3>
+          <p className="text-sm text-gray-600 mb-4">Best for high fuel/travel expenses</p>
+          <div className="space-y-2">
+            <div className="bg-green-50 p-3 rounded">
+              <h4 className="font-medium text-green-800">HDFC Regalia</h4>
+              <p className="text-xs text-green-600">4 reward points per ₹150 on fuel</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded">
+              <h4 className="font-medium text-green-800">ICICI HPCL Super Saver</h4>
+              <p className="text-xs text-green-600">Fuel surcharge waiver + rewards</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded">
+              <h4 className="font-medium text-green-800">IndianOil Citibank</h4>
+              <p className="text-xs text-green-600">4% fuel savings, 1% on others</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
+          <h3 className="text-lg font-medium text-gray-800 mb-3">Entertainment & Dining</h3>
+          <p className="text-sm text-gray-600 mb-4">Best for dining and entertainment</p>
+          <div className="space-y-2">
+            <div className="bg-purple-50 p-3 rounded">
+              <h4 className="font-medium text-purple-800">HDFC Swiggy Card</h4>
+              <p className="text-xs text-purple-600">10% on Swiggy, 5% on dining</p>
+            </div>
+            <div className="bg-purple-50 p-3 rounded">
+              <h4 className="font-medium text-purple-800">Zomato RBL Card</h4>
+              <p className="text-xs text-purple-600">10% on Zomato, dining rewards</p>
+            </div>
+            <div className="bg-purple-50 p-3 rounded">
+              <h4 className="font-medium text-purple-800">ICICI Sapphiro</h4>
+              <p className="text-xs text-purple-600">2 points per ₹100 on dining & movies</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* Save Button */}
-        <div className="flex justify-end mt-8">
-          <button
-            onClick={handleSave}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
-          >
-            <Save className="h-4 w-4" />
-            <span>Save Budget</span>
-          </button>
+      {/* Detailed Card Analysis */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-800 mb-6">Detailed Card Analysis</h3>
+        
+        <div className="space-y-6">
+          {/* HDFC Cards */}
+          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6 rounded-lg">
+            <h4 className="font-semibold text-orange-800 mb-3">HDFC Bank Cards</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h5 className="font-medium text-orange-700 mb-2">HDFC Millennia:</h5>
+                <ul className="text-sm text-orange-600 space-y-1">
+                  <li>• 2.5% cashback on groceries & online shopping</li>
+                  <li>• 1% cashback on all other purchases</li>
+                  <li>• Annual fee: ₹1,000 (waived on ₹1L spend)</li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-medium text-orange-700 mb-2">HDFC Regalia:</h5>
+                <ul className="text-sm text-orange-600 space-y-1">
+                  <li>• 4 reward points per ₹150 on fuel</li>
+                  <li>• 2 points per ₹150 on dining & shopping</li>
+                  <li>• Annual fee: ₹2,500 (waived on ₹3L spend)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* ICICI Cards */}
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg">
+            <h4 className="font-semibold text-blue-800 mb-3">ICICI Bank Cards</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h5 className="font-medium text-blue-700 mb-2">ICICI Amazon Pay:</h5>
+                <ul className="text-sm text-blue-600 space-y-1">
+                  <li>• 2% cashback on Amazon purchases</li>
+                  <li>• 1% cashback on all other purchases</li>
+                  <li>• No annual fee, instant approval</li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-medium text-blue-700 mb-2">ICICI Sapphiro:</h5>
+                <ul className="text-sm text-blue-600 space-y-1">
+                  <li>• 2 reward points per ₹100 on dining & movies</li>
+                  <li>• 1 point per ₹100 on all other purchases</li>
+                  <li>• Annual fee: ₹3,500 (waived on ₹4L spend)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* SBI Cards */}
+          <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg">
+            <h4 className="font-semibold text-green-800 mb-3">SBI Cards</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h5 className="font-medium text-green-700 mb-2">SBI Simply Save:</h5>
+                <ul className="text-sm text-green-600 space-y-1">
+                  <li>• 5% cashback on groceries (up to ₹2000/month)</li>
+                  <li>• 1% cashback on all other purchases</li>
+                  <li>• Annual fee: ₹499 (waived on ₹1L spend)</li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-medium text-green-700 mb-2">SBI Prime:</h5>
+                <ul className="text-sm text-green-600 space-y-1">
+                  <li>• 5X reward points on dining & movies</li>
+                  <li>• 1X points on all other categories</li>
+                  <li>• Annual fee: ₹2,999 (waived on ₹3L spend)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-6 rounded-lg">
+            <h4 className="font-semibold text-yellow-800 mb-3">Selection Tips & Important Notes</h4>
+            <div className="space-y-2">
+              <p className="text-sm text-yellow-700">
+                • <strong>Choose based on your top spending categories:</strong> Grocery → HDFC Millennia, Fuel → HDFC Regalia, Online → ICICI Amazon Pay
+              </p>
+              <p className="text-sm text-yellow-700">
+                • <strong>Annual fee vs benefits:</strong> Calculate if rewards earned exceed annual fees
+              </p>
+              <p className="text-sm text-yellow-700">
+                • <strong>Always pay full balance on time</strong> to avoid interest charges that negate rewards
+              </p>
+              <p className="text-sm text-yellow-700">
+                • <strong>Credit score requirement:</strong> Most premium cards need 750+ CIBIL score
+              </p>
+              <p className="text-sm text-yellow-700">
+                • <strong>Don't overspend for rewards</strong> - rewards should be a bonus, not a reason to spend more
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

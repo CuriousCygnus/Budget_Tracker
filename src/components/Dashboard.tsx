@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Transaction, Budget } from '../types';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import {
@@ -6,12 +6,14 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
   ArcElement,
 } from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
+import { Bar, Pie, Line } from 'react-chartjs-2';
 import { 
   calculateMonthlyTotals, 
   calculateCategoryTotals, 
@@ -19,13 +21,15 @@ import {
   formatCurrency 
 } from '../utils/calculations';
 import { getCategoryColor, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../data/categories';
-import { TrendingUp, TrendingDown, AlertCircle, Download, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Download, ChevronLeft, ChevronRight, Wallet, Brain, Loader } from 'lucide-react';
 import { exportMonthlyReportToExcel } from '../utils/excelExport';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
@@ -38,18 +42,27 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  // Set default to most recent month with data, or current month if no data
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    if (transactions.length === 0) return new Date();
+    
+    const monthsWithData = Array.from(new Set(
+      transactions.map(t => format(t.date, 'yyyy-MM'))
+    )).sort().reverse();
+    
+    return monthsWithData.length > 0 ? new Date(monthsWithData[0] + '-01') : new Date();
+  });
+  const [viewMode, setViewMode] = useState<'monthly' | 'cumulative'>('monthly');
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [insights, setInsights] = useState<string[]>([]);
   
-  // Generate array of months for the slider (12 months back from current date)
+  // Generate array of months that have transaction data
   const generateMonthOptions = () => {
-    const months = [];
-    const currentDate = new Date();
-    for (let i = 0; i < 12; i++) {
-      const month = new Date();
-      month.setMonth(currentDate.getMonth() - (11 - i));
-      months.push(month);
-    }
-    return months;
+    const monthsWithData = Array.from(new Set(
+      transactions.map(t => format(t.date, 'yyyy-MM'))
+    )).sort().map(monthStr => new Date(monthStr + '-01'));
+    
+    return monthsWithData.length > 0 ? monthsWithData : [new Date()];
   };
 
   const monthOptions = generateMonthOptions();
@@ -58,14 +71,27 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
     month.getFullYear() === selectedMonth.getFullYear()
   );
 
+  // Filter transactions based on view mode
+  const getFilteredTransactions = () => {
+    if (viewMode === 'cumulative') {
+      return transactions;
+    } else {
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+      return transactions.filter(t => t.date >= monthStart && t.date <= monthEnd);
+    }
+  };
+
+  const filteredTransactions = getFilteredTransactions();
+
   const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const index = parseInt(event.target.value);
     setSelectedMonth(monthOptions[index]);
   };
 
   const currentMonth = selectedMonth;
-  const monthlyData = calculateMonthlyTotals(transactions, budgets, currentMonth);
-  const categoryTotals = calculateCategoryTotals(transactions, currentMonth);
+  const monthlyData = calculateMonthlyTotals(filteredTransactions, budgets, currentMonth);
+  const categoryTotals = calculateCategoryTotals(filteredTransactions, currentMonth);
 
   const handleExportExcel = () => {
     exportMonthlyReportToExcel(transactions, budgets, selectedMonth);
@@ -83,109 +109,293 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
     setSelectedMonth(new Date());
   };
 
-  // Calculate net worth (total savings accumulated over time)
-  const calculateNetWorth = () => {
-    const allSavingsTransactions = transactions.filter(t => 
-      t.type === 'expense' && 
-      t.category === 'Savings' &&
-      t.date <= endOfMonth(selectedMonth)
-    );
-    return allSavingsTransactions.reduce((sum, t) => sum + t.amount, 0);
+  // Get months with actual transaction data for charts
+  const getMonthsWithData = (monthCount: number = 6) => {
+    const monthsWithData = Array.from(new Set(
+      transactions.map(t => format(t.date, 'yyyy-MM'))
+    )).sort().slice(-monthCount);
+    
+    return monthsWithData.map(month => {
+      const monthDate = new Date(month + '-01');
+      const monthlyData = calculateMonthlyTotals(transactions, budgets, monthDate);
+      
+      // Calculate expenses excluding savings
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const monthTransactions = transactions.filter(t => 
+        t.date >= monthStart && t.date <= monthEnd && t.type === 'expense'
+      );
+      
+      const expensesExcludingSavings = monthTransactions.filter(t => {
+        if (t.category === 'Savings') return false;
+        
+        const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+        const description = (t.description || '').toLowerCase();
+        const subcategory = (t.subcategory || '').toLowerCase();
+        
+        return !investmentKeywords.some(keyword => 
+          description.includes(keyword) || subcategory.includes(keyword)
+        );
+      }).reduce((sum, t) => sum + t.amount, 0);
+      
+      return {
+        month: format(monthDate, 'MMM yyyy'),
+        shortMonth: format(monthDate, 'MMM'),
+        ...monthlyData,
+        expensesExcludingSavings
+      };
+    });
   };
 
-  const netWorth = calculateNetWorth();
+  // Calculate KPIs
+  const calculateKPIs = (transactionsToUse: Transaction[]) => {
+    // Net worth (total savings accumulated over time)
+    const allSavingsTransactions = transactionsToUse.filter(t => {
+      if (t.type !== 'expense') return false;
+      
+      // For monthly view, only include transactions up to the selected month
+      if (viewMode === 'monthly' && t.date > endOfMonth(selectedMonth)) return false;
+      
+      // Check if it's in the Savings category
+      if (t.category === 'Savings') return true;
+      
+      // Check if it's an investment-related transaction
+      const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+      const description = (t.description || '').toLowerCase();
+      const subcategory = (t.subcategory || '').toLowerCase();
+      
+      return investmentKeywords.some(keyword => 
+        description.includes(keyword) || subcategory.includes(keyword)
+      );
+    });
+    const netWorth = allSavingsTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate monthly averages
+    let monthCount = 1;
+    if (viewMode === 'cumulative') {
+      const monthsWithData = new Set(transactionsToUse.map(t => format(t.date, 'yyyy-MM')));
+      monthCount = monthsWithData.size || 1;
+    }
+
+    const totalIncome = transactionsToUse.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = transactionsToUse.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const totalSavings = allSavingsTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    const avgMonthlyIncome = viewMode === 'cumulative' ? totalIncome / monthCount : totalIncome;
+    const avgMonthlyExpense = viewMode === 'cumulative' ? totalExpenses / monthCount : totalExpenses;
+    const savingsRatio = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+
+    // Calculate debt to income ratio
+    const debtTransactions = transactionsToUse.filter(t => t.type === 'expense' && t.category === 'Debt');
+    const totalDebt = debtTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const debtToIncomeRatio = totalIncome > 0 ? (totalDebt / totalIncome) * 100 : 0;
+
+    return {
+      netWorth,
+      avgMonthlyIncome,
+      avgMonthlyExpense,
+      savingsRatio,
+      debtToIncomeRatio
+    };
+  };
+
+  const kpis = calculateKPIs(filteredTransactions);
+
+  // Auto-generate insights when transactions change
+  useEffect(() => {
+    if (transactions.length > 0 && !loadingInsights && insights.length === 0) {
+      generateInsights();
+    }
+  }, [transactions, viewMode, selectedMonth]);
 
   // Summary cards calculations
   const incomeSurplus = monthlyData.income - monthlyData.expenses;
   const budgetVariance = monthlyData.budgetedExpenses - monthlyData.expenses;
 
-  // Chart data preparations
-  const last6Months = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    return date;
-  }).reverse();
+  // Chart data preparations - only months with data
+  const monthlyChartData = getMonthsWithData(6);
 
-  const monthlyChartData = last6Months.map(month => 
-    calculateMonthlyTotals(transactions, budgets, month)
-  );
-
-  const incomeBarData = {
-    labels: monthlyChartData.map(data => format(new Date(data.month + '-01'), 'MMM')),
+  // Combined income and expense line chart
+  const incomeExpenseLineData = {
+    labels: monthlyChartData.map(data => data.shortMonth),
     datasets: [
       {
-        label: 'Actual Income',
+        label: 'Income',
         data: monthlyChartData.map(data => data.income),
-        backgroundColor: '#22C55E',
-        borderRadius: 4,
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        fill: false,
+        tension: 0.1,
+        pointRadius: 8,
+        pointHoverRadius: 10,
+        borderWidth: 5,
+        pointBackgroundColor: '#10B981',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 4,
       },
       {
-        label: 'Budgeted Income',
-        data: monthlyChartData.map(data => data.budgetedIncome),
-        backgroundColor: '#86EFAC',
-        borderRadius: 4,
+        label: 'Expenses (Excluding Savings)', 
+        data: monthlyChartData.map(data => data.expensesExcludingSavings),
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        fill: false,
+        tension: 0.1,
+        pointRadius: 8,
+        pointHoverRadius: 10,
+        borderWidth: 5,
+        pointBackgroundColor: '#EF4444',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 4,
       }
     ]
   };
 
-  const expenseBarData = {
-    labels: monthlyChartData.map(data => format(new Date(data.month + '-01'), 'MMM')),
-    datasets: [
-      {
-        label: 'Actual Expenses',
-        data: monthlyChartData.map(data => data.expenses),
-        backgroundColor: '#A16207',
-        borderRadius: 4,
-      },
-      {
-        label: 'Budgeted Expenses',
-        data: monthlyChartData.map(data => data.budgetedExpenses),
-        backgroundColor: '#FDE68A',
-        borderRadius: 4,
+  // Generate AI insights
+  const generateInsights = async () => {
+    setLoadingInsights(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/financial-analysis`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactions: transactions.map(t => ({
+            id: t.id,
+            date: t.date.toISOString().split('T')[0],
+            description: t.description || `${t.category} - ${t.subcategory}`,
+            amount: t.amount,
+            category: t.category,
+            subcategory: t.subcategory,
+            type: t.type
+          })),
+          action: 'analyze'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setInsights(data.metrics?.insights || []);
+      } else {
+        const fallbackInsights = [];
+        
+        if (kpis.debtToIncomeRatio > 36) {
+          fallbackInsights.push(`Your debt-to-income ratio is ${kpis.debtToIncomeRatio.toFixed(1)}%, which is above the recommended 36%. Consider paying down high-interest debt first.`);
+        } else {
+          fallbackInsights.push(`Your debt-to-income ratio of ${kpis.debtToIncomeRatio.toFixed(1)}% is healthy and within recommended limits.`);
+        }
+        
+        if (kpis.savingsRatio < 15) {
+          fallbackInsights.push(`Your savings rate of ${kpis.savingsRatio.toFixed(1)}% is below the recommended 15%. Try to increase your savings by reducing discretionary spending.`);
+        } else {
+          fallbackInsights.push(`Excellent! Your savings rate of ${kpis.savingsRatio.toFixed(1)}% exceeds the recommended 15%.`);
+        }
+        
+        setInsights(fallbackInsights);
       }
-    ]
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      setInsights(['Unable to generate insights at this time. Please try again later.']);
+    } finally {
+      setLoadingInsights(false);
+    }
   };
 
-  // Current month transactions for pie charts
-  const currentMonthTransactions = transactions.filter(t => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    return t.date >= monthStart && t.date <= monthEnd;
-  });
+  // Calculate category breakdown for P&L table
+  const calculateCategoryBreakdown = () => {
+    const breakdown: { [key: string]: { category: string; type: 'income' | 'expense'; months: { [key: string]: number } } } = {};
+    
+    // Get all months with data
+    const allMonths = Array.from(new Set(
+      transactions.map(t => format(t.date, 'yyyy-MM'))
+    )).sort().reverse();
+    
+    transactions.forEach(transaction => {
+      const monthKey = format(transaction.date, 'yyyy-MM');
+      const categoryKey = `${transaction.category}-${transaction.type}`;
+      
+      if (!breakdown[categoryKey]) {
+        breakdown[categoryKey] = {
+          category: transaction.category,
+          type: transaction.type,
+          months: {}
+        };
+      }
+      
+      if (!breakdown[categoryKey].months[monthKey]) {
+        breakdown[categoryKey].months[monthKey] = 0;
+      }
+      
+      breakdown[categoryKey].months[monthKey] += transaction.amount;
+    });
+    
+    return breakdown;
+  };
 
-  const categoryBudgets = budgets.filter(b => {
-    const budgetMonth = new Date(b.month);
-    return budgetMonth.getMonth() === currentMonth.getMonth() && 
-           budgetMonth.getFullYear() === currentMonth.getFullYear();
+  const categoryBreakdown = calculateCategoryBreakdown();
+
+  // Get months data for P&L table
+  const monthsData = Array.from(new Set(
+    transactions.map(t => format(t.date, 'yyyy-MM'))
+  )).sort().reverse().slice(0, 6).map(month => {
+    const monthDate = new Date(month + '-01');
+    const monthlyData = calculateMonthlyTotals(transactions, budgets, monthDate);
+    
+    return {
+      month,
+      ...monthlyData
+    };
   });
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header with Export Button */}
       <div className="bg-white p-6 rounded-xl shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800">Financial Dashboard</h1>
+            <h2 className="text-2xl font-bold text-gray-800">Financial Dashboard</h2>
             <p className="text-gray-600 mt-1">
-              {format(selectedMonth, 'MMMM yyyy')} Overview
+              {viewMode === 'cumulative' ? 'Cumulative Overview' : `${format(selectedMonth, 'MMMM yyyy')} Overview`}
+              {viewMode === 'monthly' && ' - Select month below to analyze'}
             </p>
           </div>
-          <button
-            onClick={handleExportExcel}
-            className="mt-4 sm:mt-0 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export Monthly Report</span>
-          </button>
+          <div className="mt-4 sm:mt-0">
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('monthly')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'monthly'
+                    ? 'bg-white text-green-700 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setViewMode('cumulative')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'cumulative'
+                    ? 'bg-white text-green-700 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Cumulative
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-8 pb-12 flex justify-center">
+        {viewMode === 'monthly' && (
+          <div className="mt-8 pb-12 flex justify-center">
           <div className="w-3/4 relative">
             <input
               type="range"
               min="0"
               max={monthOptions.length - 1}
-              value={selectedMonthIndex}
+              value={selectedMonthIndex >= 0 ? selectedMonthIndex : 0}
               onChange={handleSliderChange}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             />
@@ -207,19 +417,21 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
               ))}
             </div>
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Summary Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Net Worth</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {formatCurrency(netWorth)}
+              <p className="text-sm font-medium text-gray-600">
+                {viewMode === 'cumulative' ? 'Net Worth (Total)' : 'Net Worth (Month)'}
               </p>
-              <p className="text-xs text-gray-500">Total Savings</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {formatCurrency(kpis.netWorth)}
+              </p>
             </div>
             <Wallet className="h-8 w-8 text-blue-500" />
           </div>
@@ -228,80 +440,104 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
         <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Income Surplus</p>
+              <p className="text-sm font-medium text-gray-600">
+                {viewMode === 'cumulative' ? 'Avg Monthly Income' : 'Monthly Income'}
+              </p>
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(incomeSurplus)}
+                {formatCurrency(kpis.avgMonthlyIncome)}
               </p>
             </div>
             <TrendingUp className="h-8 w-8 text-green-500" />
           </div>
         </div>
 
-        <div className={`bg-white p-6 rounded-xl shadow-lg border-l-4 ${
-          budgetVariance >= 0 ? 'border-green-500' : 'border-red-500'
-        }`}>
+        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Budget Variance</p>
-              <p className={`text-2xl font-bold ${
-                budgetVariance >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {formatCurrency(budgetVariance)}
+              <p className="text-sm font-medium text-gray-600">
+                {viewMode === 'cumulative' ? 'Avg Monthly Expense' : 'Monthly Expense'}
+              </p>
+              <p className="text-2xl font-bold text-red-600">
+                {formatCurrency(kpis.avgMonthlyExpense)}
               </p>
             </div>
-            {budgetVariance >= 0 ? 
-              <TrendingUp className="h-8 w-8 text-green-500" /> :
-              <TrendingDown className="h-8 w-8 text-red-500" />
-            }
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-amber-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-              <p className="text-2xl font-bold text-amber-600">
-                {formatCurrency(monthlyData.expenses)}
-              </p>
-            </div>
-            <AlertCircle className="h-8 w-8 text-amber-500" />
+            <TrendingDown className="h-8 w-8 text-red-500" />
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Income</p>
+              <p className="text-sm font-medium text-gray-600">Savings Ratio</p>
               <p className="text-2xl font-bold text-purple-600">
-                {formatCurrency(monthlyData.income)}
+                {kpis.savingsRatio.toFixed(1)}%
               </p>
             </div>
             <TrendingUp className="h-8 w-8 text-purple-500" />
           </div>
         </div>
+
+        <div className={`bg-white p-6 rounded-xl shadow-lg border-l-4 ${
+          kpis.debtToIncomeRatio > 36 ? 'border-red-500' : 'border-green-500'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Debt to Income Ratio</p>
+              <p className={`text-2xl font-bold ${
+                kpis.debtToIncomeRatio > 36 ? 'text-red-600' : 'text-green-600'
+              }`}>
+                {kpis.debtToIncomeRatio.toFixed(1)}%
+              </p>
+            </div>
+            <AlertCircle className={`h-8 w-8 ${
+              kpis.debtToIncomeRatio > 36 ? 'text-red-500' : 'text-green-500'
+            }`} />
+          </div>
+        </div>
       </div>
 
-      {/* P&L Summary Section */}
+      {/* Income vs Expense Trend and Personal Finance Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Income vs Budget Chart */}
+        {/* Combined Income and Expense Trend */}
         <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Income Trend (6 Months)</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Income vs Expense Trend</h3>
           <div className="h-64">
-            <Bar 
-              data={incomeBarData}
+            <Line 
+              data={incomeExpenseLineData}
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                  legend: { position: 'top' },
+                  legend: { 
+                    position: 'top',
+                    labels: {
+                      usePointStyle: true,
+                      pointStyle: 'line'
+                    }
+                  },
                 },
                 scales: {
-                  y: { 
-                    beginAtZero: true,
+                  y: {
+                    beginAtZero: false,
+                    min: 85000,
+                    max: 135000,
+                    grid: {
+                      color: 'rgba(0, 0, 0, 0.1)',
+                    },
                     ticks: {
+                      stepSize: 10000,
                       callback: function(value) {
                         return formatCurrency(value as number);
                       }
+                    }
+                  },
+                  x: {
+                    grid: {
+                      color: 'rgba(0, 0, 0, 0.1)',
+                    },
+                    ticks: {
+                      maxRotation: 45,
+                      minRotation: 0
                     }
                   }
                 }
@@ -310,188 +546,347 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgets }) => {
           </div>
         </div>
 
-        {/* Expense vs Budget Chart */}
+        {/* Personal Finance Insights */}
         <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Expense Trend (6 Months)</h3>
-          <div className="h-64">
-            <Bar 
-              data={expenseBarData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { position: 'top' },
-                },
-                scales: {
-                  y: { 
-                    beginAtZero: true,
-                    ticks: {
-                      callback: function(value) {
-                        return formatCurrency(value as number);
-                      }
-                    }
-                  }
-                }
-              }}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Personal Finance Insights</h3>
+            <button
+              onClick={generateInsights}
+              disabled={loadingInsights}
+              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-3 py-1 rounded-lg text-sm transition-colors flex items-center space-x-2"
+            >
+              {loadingInsights ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <Brain className="h-4 w-4" />
+              )}
+              <span>{loadingInsights ? 'Analyzing...' : 'Generate'}</span>
+            </button>
           </div>
-        </div>
-      </div>
-
-      {/* Category Breakdown Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Income Categories Pie Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Income Categories</h3>
           <div className="h-64">
-            {currentMonthTransactions.filter(t => t.type === 'income').length > 0 ? (
-              <Pie 
-                data={{
-                  labels: Object.keys(INCOME_CATEGORIES).filter(cat => categoryTotals[cat] > 0),
-                  datasets: [{
-                    data: Object.keys(INCOME_CATEGORIES)
-                      .filter(cat => categoryTotals[cat] > 0)
-                      .map(cat => categoryTotals[cat]),
-                    backgroundColor: Object.keys(INCOME_CATEGORIES)
-                      .filter(cat => categoryTotals[cat] > 0)
-                      .map(cat => getCategoryColor(cat)),
-                    borderWidth: 2,
-                    borderColor: '#ffffff',
-                  }]
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { position: 'right' },
-                    tooltip: {
-                      callbacks: {
-                        label: function(context) {
-                          return `${context.label}: ${formatCurrency(context.parsed)}`;
-                        }
-                      }
-                    }
-                  }
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                No income data for this month
+            {loadingInsights ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Expense Categories Pie Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Expense Categories</h3>
-          <div className="h-64">
-            {currentMonthTransactions.filter(t => t.type === 'expense').length > 0 ? (
-              <Pie 
-                data={{
-                  labels: Object.keys(EXPENSE_CATEGORIES).filter(cat => categoryTotals[cat] > 0),
-                  datasets: [{
-                    data: Object.keys(EXPENSE_CATEGORIES)
-                      .filter(cat => categoryTotals[cat] > 0)
-                      .map(cat => categoryTotals[cat]),
-                    backgroundColor: Object.keys(EXPENSE_CATEGORIES)
-                      .filter(cat => categoryTotals[cat] > 0)
-                      .map(cat => getCategoryColor(cat)),
-                    borderWidth: 2,
-                    borderColor: '#ffffff',
-                  }]
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { position: 'right' },
-                    tooltip: {
-                      callbacks: {
-                        label: function(context) {
-                          return `${context.label}: ${formatCurrency(context.parsed)}`;
-                        }
-                      }
-                    }
-                  }
-                }}
-              />
+            ) : insights.length > 0 ? (
+              <div className="space-y-3 overflow-y-auto h-full">
+                {insights.map((insight, index) => (
+                  <div key={index} className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+                    <p className="text-sm text-gray-700">{insight}</p>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
-                No expense data for this month
+                <div className="text-center">
+                  <Brain className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm">Click "Generate" to get AI-powered insights</p>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* P&L Summary Section */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* P&L Summary */}
-        <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly P&L Summary</h3>
-          <div className="space-y-4">
-            {/* Income Section */}
-            <div>
-              <h4 className="font-medium text-green-700 mb-2">Income</h4>
-              {Object.keys(INCOME_CATEGORIES).map(category => {
-                const actual = categoryTotals[category] || 0;
-                const budget = categoryBudgets.find(b => b.category === category)?.amount || 0;
-                const variance = getBudgetVariance(actual, budget);
-
-                return (
-                  <div key={category} className="flex justify-between items-center py-1">
-                    <span className="text-sm text-gray-600">{category}</span>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium">{formatCurrency(actual)}</span>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        variance.isOver ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+      {/* Monthly P&L Summary */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-800 mb-6">Monthly P&L Summary</h3>
+        {monthsData.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-gray-300">
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Particulars</th>
+                  {monthsData.slice(0, 6).map((monthData, index) => (
+                    <th key={index} className="text-center py-3 px-3 font-semibold text-gray-700 bg-gray-50 min-w-[120px]">
+                      {monthData.month}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Income Section */}
+                <tr className="border-b border-gray-200 bg-green-50">
+                  <td className="py-2 px-4 font-semibold text-green-800">INCOME</td>
+                  {monthsData.slice(0, 6).map((_, index) => (
+                    <td key={index} className="py-2 px-3"></td>
+                  ))}
+                </tr>
+                
+                {/* Income Categories */}
+                {Object.values(categoryBreakdown)
+                  .filter(item => item.type === 'income')
+                  .sort((a, b) => {
+                    const aTotal = Object.values(a.months).reduce((sum, val) => sum + val, 0);
+                    const bTotal = Object.values(b.months).reduce((sum, val) => sum + val, 0);
+                    return bTotal - aTotal;
+                  })
+                  .map((item, idx) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-4 pl-8 text-gray-700">{item.category}</td>
+                      {monthsData.slice(0, 6).map((monthData, index) => (
+                        <td key={index} className="py-2 px-3 text-center text-green-600 font-medium">
+                          {item.months[monthData.month] ? formatCurrency(item.months[monthData.month]) : '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                
+                <tr className="border-b border-gray-200 bg-green-100">
+                  <td className="py-2 px-4 pl-4 font-semibold text-green-800">Total Income</td>
+                  {monthsData.slice(0, 6).map((monthData, index) => (
+                    <td key={index} className="py-2 px-3 text-center text-green-600 font-medium">
+                      {monthData.income > 0 ? formatCurrency(monthData.income) : '-'}
+                    </td>
+                  ))}
+                </tr>
+                
+                {/* Expenses Section (Excluding Savings) */}
+                <tr className="border-b border-gray-200 bg-red-50">
+                  <td className="py-2 px-4 font-semibold text-red-800">EXPENSES</td>
+                  {monthsData.slice(0, 6).map((_, index) => (
+                    <td key={index} className="py-2 px-3"></td>
+                  ))}
+                </tr>
+                
+                {/* Expense Categories */}
+                {Object.values(categoryBreakdown)
+                  .filter(item => {
+                    if (item.type !== 'expense') return false;
+                    
+                    // Check if it's a savings/investment category
+                    if (item.category === 'Savings') return false;
+                    
+                    // Check if it's investment-related by examining transactions
+                    const categoryTransactions = transactions.filter(t => t.category === item.category);
+                    const isInvestmentCategory = categoryTransactions.some(t => {
+                      const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+                      const description = (t.description || '').toLowerCase();
+                      const subcategory = (t.subcategory || '').toLowerCase();
+                      return investmentKeywords.some(keyword => 
+                        description.includes(keyword) || subcategory.includes(keyword)
+                      );
+                    });
+                    
+                    return !isInvestmentCategory;
+                  })
+                  .sort((a, b) => {
+                    const aTotal = Object.values(a.months).reduce((sum, val) => sum + val, 0);
+                    const bTotal = Object.values(b.months).reduce((sum, val) => sum + val, 0);
+                    return bTotal - aTotal;
+                  })
+                  .map((item, idx) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-4 pl-8 text-gray-700">{item.category}</td>
+                      {monthsData.slice(0, 6).map((monthData, index) => (
+                        <td key={index} className="py-2 px-3 text-center text-red-600 font-medium">
+                          {item.months[monthData.month] ? formatCurrency(item.months[monthData.month]) : '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                
+                <tr className="border-b border-gray-200 bg-red-100">
+                  <td className="py-2 px-4 pl-4 font-semibold text-red-800">Total Expenses</td>
+                  {monthsData.slice(0, 6).map((monthData, index) => (
+                    <td key={index} className="py-2 px-3 text-center text-red-600 font-medium">
+                      {(() => {
+                        // Parse month string properly
+                        const [year, month] = monthData.month.split('-');
+                        const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                        const monthStart = startOfMonth(monthDate);
+                        const monthEnd = endOfMonth(monthDate);
+                        
+                        const monthTransactions = transactions.filter(t => 
+                          t.date >= monthStart && t.date <= monthEnd && t.type === 'expense'
+                        );
+                        
+                        // Filter out savings/investment transactions
+                        const nonSavingsExpenses = monthTransactions.filter(t => {
+                          // Exclude Savings category
+                          if (t.category === 'Savings') return false;
+                          
+                          // Exclude investment-related transactions
+                          const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+                          const description = (t.description || '').toLowerCase();
+                          const subcategory = (t.subcategory || '').toLowerCase();
+                          
+                          return !investmentKeywords.some(keyword => 
+                            description.includes(keyword) || subcategory.includes(keyword)
+                          );
+                        });
+                        
+                        const totalNonSavingsExpenses = nonSavingsExpenses.reduce((sum, t) => sum + t.amount, 0);
+                        return totalNonSavingsExpenses > 0 ? formatCurrency(totalNonSavingsExpenses) : '-';
+                      })()}
+                    </td>
+                  ))}
+                </tr>
+                
+                {/* Savings Breakdown */}
+                <tr className="border-b border-gray-200 bg-purple-50">
+                  <td className="py-2 px-4 font-semibold text-purple-800">SAVINGS BREAKDOWN</td>
+                  {monthsData.slice(0, 6).map((_, index) => (
+                    <td key={index} className="py-2 px-3"></td>
+                  ))}
+                </tr>
+                
+                {/* Savings Categories */}
+                {Object.values(categoryBreakdown)
+                  .filter(item => item.type === 'expense' && (
+                    item.category === 'Savings' || 
+                    (() => {
+                      // Check if category has investment-related transactions
+                      const categoryTransactions = transactions.filter(t => t.category === item.category);
+                      return categoryTransactions.some(t => {
+                        const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+                        const description = (t.description || '').toLowerCase();
+                        const subcategory = (t.subcategory || '').toLowerCase();
+                        return investmentKeywords.some(keyword => 
+                          description.includes(keyword) || subcategory.includes(keyword)
+                        );
+                      });
+                    })()
+                  ))
+                  .sort((a, b) => {
+                    const aTotal = Object.values(a.months).reduce((sum, val) => sum + val, 0);
+                    const bTotal = Object.values(b.months).reduce((sum, val) => sum + val, 0);
+                    return bTotal - aTotal;
+                  })
+                  .map((item, idx) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-4 pl-8 text-gray-700">{item.category}</td>
+                      {monthsData.slice(0, 6).map((monthData, index) => (
+                        <td key={index} className="py-2 px-3 text-center text-purple-600 font-medium">
+                          {item.months[monthData.month] ? formatCurrency(item.months[monthData.month]) : '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                
+                <tr className="border-b border-gray-200 bg-purple-100">
+                  <td className="py-2 px-4 pl-4 font-semibold text-purple-800">Total Savings</td>
+                  {monthsData.slice(0, 6).map((monthData, index) => {
+                    // Calculate savings amount for this month
+                    const [year, month] = monthData.month.split('-');
+                    const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                    const monthStart = startOfMonth(monthDate);
+                    const monthEnd = endOfMonth(monthDate);
+                    
+                    const monthTransactions = transactions.filter(t => 
+                      t.date >= monthStart && t.date <= monthEnd && t.type === 'expense'
+                    );
+                    
+                    const savingsTransactions = monthTransactions.filter(t => {
+                      // Include Savings category
+                      if (t.category === 'Savings') return true;
+                      
+                      // Include investment-related transactions
+                      const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+                      const description = (t.description || '').toLowerCase();
+                      const subcategory = (t.subcategory || '').toLowerCase();
+                      
+                      return investmentKeywords.some(keyword => 
+                        description.includes(keyword) || subcategory.includes(keyword)
+                      );
+                    });
+                    
+                    const savingsAmount = savingsTransactions.reduce((sum, t) => sum + t.amount, 0);
+                    return (
+                      <td key={index} className="py-2 px-3 text-center text-purple-600 font-medium">
+                        {savingsAmount > 0 ? formatCurrency(savingsAmount) : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+                
+                {/* Net Surplus/Deficit (Income - Expenses excluding Savings) */}
+                <tr className="border-t-2 border-gray-300 bg-blue-50">
+                  <td className="py-3 px-4 font-bold text-blue-800">NET SURPLUS / (DEFICIT)</td>
+                  {monthsData.slice(0, 6).map((monthData, index) => {
+                    // Parse month string properly
+                    const [year, month] = monthData.month.split('-');
+                    const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                    const monthStart = startOfMonth(monthDate);
+                    const monthEnd = endOfMonth(monthDate);
+                    
+                    const monthTransactions = transactions.filter(t => 
+                      t.date >= monthStart && t.date <= monthEnd && t.type === 'expense'
+                    );
+                    
+                    // Filter out savings/investment transactions
+                    const nonSavingsExpenses = monthTransactions.filter(t => {
+                      if (t.category === 'Savings') return false;
+                      
+                      const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+                      const description = (t.description || '').toLowerCase();
+                      const subcategory = (t.subcategory || '').toLowerCase();
+                      
+                      return !investmentKeywords.some(keyword => 
+                        description.includes(keyword) || subcategory.includes(keyword)
+                      );
+                    });
+                    
+                    const totalNonSavingsExpenses = nonSavingsExpenses.reduce((sum, t) => sum + t.amount, 0);
+                    const netAmount = monthData.income - totalNonSavingsExpenses;
+                    
+                    return (
+                      <td key={index} className={`py-3 px-3 text-center font-bold ${
+                        netAmount >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Expense Section */}
-            <div>
-              <h4 className="font-medium text-amber-700 mb-2">Expenses</h4>
-              {Object.keys(EXPENSE_CATEGORIES).slice(0, 5).map(category => {
-                const actual = categoryTotals[category] || 0;
-                const budget = categoryBudgets.find(b => b.category === category)?.amount || 0;
-                const variance = getBudgetVariance(actual, budget);
-
-                return (
-                  <div key={category} className="flex justify-between items-center py-1">
-                    <span className="text-sm text-gray-600">{category}</span>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium">{formatCurrency(actual)}</span>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        !variance.isOver ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        {netAmount !== 0 ? formatCurrency(netAmount) : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+                
+                {/* Savings Rate */}
+                <tr className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="py-2 px-4 pl-8 text-gray-700 font-medium">Savings Rate</td>
+                  {monthsData.slice(0, 6).map((monthData, index) => {
+                    // Calculate savings amount for this month
+                    const [year, month] = monthData.month.split('-');
+                    const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                    const monthStart = startOfMonth(monthDate);
+                    const monthEnd = endOfMonth(monthDate);
+                    
+                    const monthTransactions = transactions.filter(t => 
+                      t.date >= monthStart && t.date <= monthEnd && t.type === 'expense'
+                    );
+                    
+                    const savingsTransactions = monthTransactions.filter(t => {
+                      // Include Savings category
+                      if (t.category === 'Savings') return true;
+                      
+                      // Include investment-related transactions
+                      const investmentKeywords = ['sip', 'mutual fund', 'mf', 'stock', 'stocks', 'equity', 'shares', 'fd', 'fixed deposit', 'rd', 'recurring deposit', 'aif', 'alternative investment'];
+                      const description = (t.description || '').toLowerCase();
+                      const subcategory = (t.subcategory || '').toLowerCase();
+                      
+                      return investmentKeywords.some(keyword => 
+                        description.includes(keyword) || subcategory.includes(keyword)
+                      );
+                    });
+                    
+                    const savingsAmount = savingsTransactions.reduce((sum, t) => sum + t.amount, 0);
+                    const savingsRate = monthData.income > 0 ? (savingsAmount / monthData.income) * 100 : 0;
+                    return (
+                      <td key={index} className={`py-2 px-3 text-center font-medium ${
+                        savingsRate >= 15 ? 'text-green-600' : savingsRate >= 10 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
-                        {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Net Result */}
-            <div className="border-t pt-2">
-              <div className="flex justify-between items-center">
-                <span className="font-medium text-gray-800">Net Result</span>
-                <span className={`font-bold ${
-                  incomeSurplus >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {formatCurrency(incomeSurplus)}
-                </span>
-              </div>
-            </div>
+                        {monthData.income > 0 ? `${savingsRate.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            No transaction data available
+          </div>
+        )}
       </div>
     </div>
   );
